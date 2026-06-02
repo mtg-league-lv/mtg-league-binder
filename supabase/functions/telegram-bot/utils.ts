@@ -17,13 +17,14 @@ export function formatSearchResults(
   results: Array<{
     card_name: string;
     quantity: number;
-    binders: { url: string; users: { username: string | null } };
+    binders: { url: string; username: string | null; users: { username: string | null } };
   }>
 ): string {
   const lines = results.map((r) => {
-    const handle = r.binders.users.username
-      ? `@${r.binders.users.username}`
-      : "unknown";
+    const telegramUser = r.binders.users.username;
+    const handle = telegramUser
+      ? `@${telegramUser}`
+      : (r.binders.username ?? "unknown");
     const cardName = r.card_name
       .split(" ")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))

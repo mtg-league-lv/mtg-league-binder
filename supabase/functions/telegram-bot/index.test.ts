@@ -34,23 +34,38 @@ Deno.test("upsertUser throws on error", async () => {
   assertEquals(threw, true);
 });
 
-Deno.test("formatSearchResults produces correct output", () => {
+Deno.test("formatSearchResults uses telegram username when available", () => {
   const results = [
     {
       card_name: "black lotus",
       quantity: 2,
-      binders: { url: "https://moxfield.com/binders/AAA", users: { username: "alice" } },
-    },
-    {
-      card_name: "black lotus",
-      quantity: 1,
-      binders: { url: "https://moxfield.com/binders/BBB", users: { username: null } },
+      binders: { url: "https://moxfield.com/binders/AAA", username: "BinderOwner", users: { username: "alice" } },
     },
   ];
   const msg = formatSearchResults("Black Lotus", results);
   assertEquals(
     msg,
-    "🃏 Black Lotus\n──────────────\n@alice — 2x Black Lotus\n🔗 https://moxfield.com/binders/AAA\n\nunknown — 1x Black Lotus\n🔗 https://moxfield.com/binders/BBB"
+    "🃏 Black Lotus\n──────────────\n@alice — 2x Black Lotus\n🔗 https://moxfield.com/binders/AAA"
+  );
+});
+
+Deno.test("formatSearchResults falls back to binder username when no telegram user", () => {
+  const results = [
+    {
+      card_name: "black lotus",
+      quantity: 1,
+      binders: { url: "https://moxfield.com/binders/BBB", username: "Bob", users: { username: null } },
+    },
+    {
+      card_name: "black lotus",
+      quantity: 3,
+      binders: { url: "https://moxfield.com/binders/CCC", username: null, users: { username: null } },
+    },
+  ];
+  const msg = formatSearchResults("Black Lotus", results);
+  assertEquals(
+    msg,
+    "🃏 Black Lotus\n──────────────\nBob — 1x Black Lotus\n🔗 https://moxfield.com/binders/BBB\n\nunknown — 3x Black Lotus\n🔗 https://moxfield.com/binders/CCC"
   );
 });
 
