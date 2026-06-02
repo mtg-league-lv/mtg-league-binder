@@ -12,6 +12,23 @@ export function formatBinderList(
   return "Your binders:\n\n" + lines.join("\n\n");
 }
 
+export function formatSearchResults(
+  query: string,
+  results: Array<{
+    card_name: string;
+    quantity: number;
+    binders: { url: string; users: { username: string | null } };
+  }>
+): string {
+  const lines = results.map((r) => {
+    const handle = r.binders.users.username
+      ? `@${r.binders.users.username}`
+      : "unknown";
+    return `${handle} — ${r.quantity}x\n🔗 ${r.binders.url}`;
+  });
+  return `🃏 ${query}\n──────────────\n` + lines.join("\n\n");
+}
+
 export async function upsertUser(
   client: SupabaseClient,
   id: number,

@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { upsertUser, formatBinderList } from "./utils.ts";
+import { upsertUser, formatBinderList, formatSearchResults } from "./utils.ts";
 
 Deno.test("upsertUser builds correct row", async () => {
   const calls: unknown[] = [];
@@ -32,6 +32,26 @@ Deno.test("upsertUser throws on error", async () => {
     assertEquals(e, fakeError);
   }
   assertEquals(threw, true);
+});
+
+Deno.test("formatSearchResults produces correct output", () => {
+  const results = [
+    {
+      card_name: "black lotus",
+      quantity: 2,
+      binders: { url: "https://moxfield.com/binders/AAA", users: { username: "alice" } },
+    },
+    {
+      card_name: "black lotus",
+      quantity: 1,
+      binders: { url: "https://moxfield.com/binders/BBB", users: { username: null } },
+    },
+  ];
+  const msg = formatSearchResults("Black Lotus", results);
+  assertEquals(
+    msg,
+    "🃏 Black Lotus\n──────────────\n@alice — 2x\n🔗 https://moxfield.com/binders/AAA\n\nunknown — 1x\n🔗 https://moxfield.com/binders/BBB"
+  );
 });
 
 Deno.test("formatBinderList formats list correctly", () => {

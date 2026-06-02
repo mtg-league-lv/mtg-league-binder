@@ -1,6 +1,6 @@
 import { Bot, webhookCallback } from "https://deno.land/x/grammy@v1.21.1/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { upsertUser, formatBinderList } from "./utils.ts";
+import { upsertUser, formatBinderList, formatSearchResults } from "./utils.ts";
 
 const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN")!);
 
@@ -20,7 +20,8 @@ bot.command("start", async (ctx) => {
     "Commands:\n" +
     "/register <moxfield_binder_url> — Add your binder\n" +
     "/mybinders — List your registered binders\n" +
-    "/removebinder <url> — Remove a binder"
+    "/removebinder <url> — Remove a binder\n" +
+    "/search <card name> — Find binders containing a card"
   );
 });
 
@@ -88,6 +89,37 @@ bot.command("removebinder", async (ctx) => {
   } else {
     await ctx.reply(`🗑️ Binder removed: ${url}`);
   }
+});
+
+bot.command("search", async (ctx) => {
+  if (!ctx.from) { await ctx.reply("Cannot identify sender."); return; }
+
+  const query = ctx.match?.trim();
+  if (!query) {
+    await ctx.reply("Usage: /search <card name>\nExample: /search Black Lotus");
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("binder_cards")
+    .select("card_name, quantity, binders(url, users(username))")
+    .ilike("card_name", `%${query.toLowerCase()}%`)
+    .order("card_name");
+
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    await ctx.reply(`No binders found containing "${query}".`);
+    return;
+  }
+
+  const typed = data as Array<{
+    card_name: string;
+    quantity: number;
+    binders: { url: string; users: { username: string | null } };
+  }>;
+
+  await ctx.reply(formatSearchResults(query, typed));
 });
 
 bot.catch((err) => {
