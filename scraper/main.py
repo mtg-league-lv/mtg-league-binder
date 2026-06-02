@@ -3,6 +3,7 @@ import re
 import logging
 from datetime import datetime, timezone
 from playwright.sync_api import sync_playwright
+from playwright_stealth import Stealth
 from supabase import create_client, Client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -71,9 +72,8 @@ def scrape_binder(url: str) -> list[dict]:
             locale="en-US",
             timezone_id="America/New_York",
         )
-        # Hide webdriver flag that triggers bot detection
-        context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         page = context.new_page()
+        Stealth().apply_stealth_sync(page)
 
         def handle_response(response):
             # Match the trade-binders search endpoint
@@ -94,7 +94,9 @@ def scrape_binder(url: str) -> list[dict]:
         page.on("response", handle_response)
 
         log.info("Navigating to %s", url)
-        page.goto(url, wait_until="networkidle", timeout=60000)
+        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        # Wait for the React app to load and fire API calls
+        page.wait_for_timeout(8000)
 
         context.close()
         browser.close()
