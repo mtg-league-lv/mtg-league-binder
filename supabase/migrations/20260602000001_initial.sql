@@ -23,6 +23,12 @@ create table if not exists binder_cards (
   updated_at timestamptz default now()
 );
 
+create index if not exists binders_user_id_idx
+  on binders (user_id);
+
+create index if not exists binder_cards_binder_id_idx
+  on binder_cards (binder_id);
+
 create index if not exists binder_cards_card_name_idx
   on binder_cards using gin(to_tsvector('simple', card_name));
 
