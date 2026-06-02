@@ -24,7 +24,11 @@ export function formatSearchResults(
     const handle = r.binders.users.username
       ? `@${r.binders.users.username}`
       : "unknown";
-    return `${handle} — ${r.quantity}x\n🔗 ${r.binders.url}`;
+    const cardName = r.card_name
+      .split(" ")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    return `${handle} — ${cardName} — ${r.quantity}x\n🔗 ${r.binders.url}`;
   });
   return `🃏 ${query}\n──────────────\n` + lines.join("\n\n");
 }
