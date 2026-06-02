@@ -17,23 +17,44 @@ def extract_binder_id(url: str) -> str:
 
 
 def parse_cards(api_response: dict) -> list[dict]:
-    """Parse cards from Moxfield API JSON response (boards.mainboard.cards structure)."""
+    """Parse cards from Moxfield trade-binder search API response.
+
+    The /v1/trade-binders/{id}/search endpoint returns:
+      {"data": [{"quantity": N, "card": {"name": "..."}}, ...]}
+    """
+    result = []
+
+    # /v1/trade-binders/{id}/search response shape
+    items = api_response.get("data", [])
+    if isinstance(items, list) and items:
+        for entry in items:
+            if not isinstance(entry, dict):
+                continue
+            name = entry.get("card", {}).get("name", "")
+            qty = entry.get("quantity", 1)
+            if name:
+                result.append({"card_name": name.lower().strip(), "quantity": qty})
+        if result:
+            return result
+
+    # Legacy /v2/binders response shape (boards.mainboard.cards)
     try:
         cards_map = api_response["boards"]["mainboard"]["cards"]
+        for entry in cards_map.values():
+            name = entry.get("card", {}).get("name", "")
+            qty = entry.get("quantity", 1)
+            if name:
+                result.append({"card_name": name.lower().strip(), "quantity": qty})
     except (KeyError, TypeError):
-        return []
-    result = []
-    for entry in cards_map.values():
-        name = entry.get("card", {}).get("name", "")
-        qty = entry.get("quantity", 1)
-        if name:
-            result.append({"card_name": name.lower().strip(), "quantity": qty})
+        pass
+
     return result
 
 
 def scrape_binder(url: str) -> list[dict]:
-    """Scrape a Moxfield binder page using Playwright and intercept the API response."""
-    cards: list[dict] = []
+    """Load a Moxfield binder page in a headless browser and intercept the API response."""
+    binder_id = extract_binder_id(url)
+    all_cards: list[dict] = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -43,85 +64,36 @@ def scrape_binder(url: str) -> list[dict]:
         )
         page = context.new_page()
 
-        # Intercept the Moxfield API response as the page loads
-        api_data: dict = {}
-
         def handle_response(response):
-            if "/api/" in response.url or "moxfield.com/v" in response.url or "api2.moxfield" in response.url:
-                binder_id = extract_binder_id(url)
-                if binder_id in response.url and response.status == 200:
-                    try:
-                        api_data.update(response.json())
-                        log.info("Intercepted API response from %s", response.url)
-                    except Exception:
-                        pass
+            # Match the trade-binders search endpoint
+            if (
+                "trade-binders" in response.url
+                and binder_id in response.url
+                and response.status == 200
+            ):
+                try:
+                    data = response.json()
+                    cards = parse_cards(data)
+                    if cards:
+                        all_cards.extend(cards)
+                        log.info("Intercepted %s cards from %s", len(cards), response.url[:80])
+                except Exception as exc:
+                    log.warning("Failed to parse intercepted response: %s", exc)
 
         page.on("response", handle_response)
 
         log.info("Navigating to %s", url)
         page.goto(url, wait_until="networkidle", timeout=60000)
 
-        # If we got API data via interception, use it
-        if api_data:
-            cards = parse_cards(api_data)
-            log.info("Parsed %s cards from intercepted API response", len(cards))
-        else:
-            # Fall back to DOM scraping
-            log.info("No API response intercepted, falling back to DOM scraping")
-            cards = _scrape_dom(page)
-
         context.close()
         browser.close()
 
-    return cards
-
-
-def _scrape_dom(page) -> list[dict]:
-    """Extract card names and quantities directly from the rendered DOM."""
-    cards = []
-
-    # Wait for card content to appear
-    try:
-        page.wait_for_selector("[class*='card']", timeout=15000)
-    except Exception:
-        log.warning("Timed out waiting for card elements")
-
-    # Try multiple selector strategies Moxfield uses
-    selectors = [
-        ("[data-testid='cardQuantity']", "[data-testid='cardName']"),
-    ]
-
-    # Generic approach: find quantity + name pairs via JS evaluation
-    results = page.evaluate("""
-        () => {
-            const cards = [];
-            // Try to find card rows with quantity and name
-            document.querySelectorAll('[class*="deckview"], [class*="card-row"], [class*="cardRow"]').forEach(row => {
-                const nameEl = row.querySelector('[class*="name"], [class*="Name"]');
-                const qtyEl = row.querySelector('[class*="qty"], [class*="Qty"], [class*="quantity"], [class*="Quantity"]');
-                if (nameEl && nameEl.textContent.trim()) {
-                    cards.push({
-                        name: nameEl.textContent.trim(),
-                        qty: qtyEl ? parseInt(qtyEl.textContent.trim()) || 1 : 1
-                    });
-                }
-            });
-            return cards;
-        }
-    """)
-
-    for r in results:
-        name = r.get("name", "").strip()
-        qty = r.get("qty", 1)
-        if name and not name.isdigit():
-            cards.append({"card_name": name.lower(), "quantity": qty})
-
-    if cards:
-        log.info("DOM scraping found %s cards", len(cards))
+    if all_cards:
+        log.info("Total cards scraped: %s", len(all_cards))
     else:
-        log.warning("DOM scraping found 0 cards — page may not have loaded correctly")
+        log.warning("No cards found for binder %s", binder_id)
 
-    return cards
+    return all_cards
 
 
 def sync_binder(client: Client, binder_id: str, url: str) -> None:
@@ -132,14 +104,14 @@ def sync_binder(client: Client, binder_id: str, url: str) -> None:
         log.warning("Skipping binder %s: %s", binder_id, exc)
         return
 
-    # Always update last_scraped_at so operators can see this binder was attempted
-    client.from_("binders").update({"last_scraped_at": datetime.now(timezone.utc).isoformat()}).eq("id", binder_id).execute()
+    client.from_("binders").update(
+        {"last_scraped_at": datetime.now(timezone.utc).isoformat()}
+    ).eq("id", binder_id).execute()
 
     if not cards:
         log.warning("Binder %s returned 0 cards — skipping card update to preserve existing data", binder_id)
         return
 
-    # Full replace: delete then insert
     client.from_("binder_cards").delete().eq("binder_id", binder_id).execute()
     rows = [{"binder_id": binder_id, **c} for c in cards]
     client.from_("binder_cards").insert(rows).execute()
