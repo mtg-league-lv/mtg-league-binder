@@ -24,3 +24,11 @@ def test_real_binder_card_structure():
         assert card["card_name"] == card["card_name"].lower(), "card_name should be lowercase"
         assert isinstance(card["quantity"], int)
         assert card["quantity"] >= 1
+
+
+def test_real_binder_has_more_than_4_pages():
+    """Binder should span more than 4 pages (50 cards/page) resulting in 200+ cards."""
+    cards = scrape_binder(BINDER_URL)
+    assert len(cards) > 200, (
+        f"Expected more than 200 cards (4+ pages at 50 cards/page), got {len(cards)}"
+    )

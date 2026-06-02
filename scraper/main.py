@@ -69,7 +69,10 @@ def scrape_binder(url: str) -> list[dict]:
         )
         page = context.new_page()
 
+        total_pages = 1  # updated when first API response arrives
+
         def handle_response(response):
+            nonlocal total_pages
             if (
                 "trade-binders" in response.url
                 and binder_id in response.url
@@ -77,10 +80,14 @@ def scrape_binder(url: str) -> list[dict]:
             ):
                 try:
                     data = response.json()
+                    total_pages = data.get("totalPages", 1)
                     cards = parse_cards(data)
                     if cards:
                         all_cards.extend(cards)
-                        log.info("Intercepted %s cards from %s", len(cards), response.url[:80])
+                        log.info(
+                            "Intercepted %s cards (page %s/%s) from %s",
+                            len(cards), data.get("pageNumber", "?"), total_pages, response.url[:80],
+                        )
                     else:
                         log.warning("Intercepted response but parsed 0 cards. Keys: %s", list(data.keys()) if isinstance(data, dict) else type(data))
                 except Exception as exc:
@@ -92,28 +99,14 @@ def scrape_binder(url: str) -> list[dict]:
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(8000)
 
-        # Paginate: click "next page" until the button is disabled
-        page_num = 1
-        while True:
-            # The pagination bar contains two .btn.ms-2.btn-secondary buttons:
-            # index 0 = previous, index 1 = next
+        # Paginate using totalPages from the API response.
+        # Next-page button: second .btn.ms-2.btn-secondary inside the pagination div.
+        for page_num in range(2, total_pages + 1):
             next_btn = page.locator(
                 "div.d-flex.flex-wrap.align-items-center.row-gap-3.mt-3 "
                 "button.btn.ms-2.btn-secondary"
-            ).nth(1)
-
-            try:
-                next_btn.wait_for(state="attached", timeout=3000)
-            except Exception:
-                log.info("No pagination bar found — single page binder")
-                break
-
-            if "disabled" in (next_btn.get_attribute("class") or ""):
-                log.info("Reached last page after %s page(s)", page_num)
-                break
-
-            page_num += 1
-            log.info("Clicking next page (page %s)", page_num)
+            ).last
+            log.info("Clicking to page %s/%s", page_num, total_pages)
             next_btn.click()
             page.wait_for_timeout(3000)
 
