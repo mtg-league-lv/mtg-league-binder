@@ -70,8 +70,6 @@ def scrape_binder(url: str) -> list[dict]:
         page = context.new_page()
 
         def handle_response(response):
-            if "moxfield" in response.url and response.status in (200, 403):
-                log.info("RESPONSE %s %s", response.status, response.url[:120])
             if (
                 "trade-binders" in response.url
                 and binder_id in response.url
@@ -93,6 +91,31 @@ def scrape_binder(url: str) -> list[dict]:
         log.info("Navigating to %s", url)
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(8000)
+
+        # Paginate: click "next page" until the button is disabled
+        page_num = 1
+        while True:
+            # The pagination bar contains two .btn.ms-2.btn-secondary buttons:
+            # index 0 = previous, index 1 = next
+            next_btn = page.locator(
+                "div.d-flex.flex-wrap.align-items-center.row-gap-3.mt-3 "
+                "button.btn.ms-2.btn-secondary"
+            ).nth(1)
+
+            try:
+                next_btn.wait_for(state="attached", timeout=3000)
+            except Exception:
+                log.info("No pagination bar found — single page binder")
+                break
+
+            if "disabled" in (next_btn.get_attribute("class") or ""):
+                log.info("Reached last page after %s page(s)", page_num)
+                break
+
+            page_num += 1
+            log.info("Clicking next page (page %s)", page_num)
+            next_btn.click()
+            page.wait_for_timeout(3000)
 
         context.close()
         browser.close()
