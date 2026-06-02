@@ -1,6 +1,6 @@
 import { Bot, webhookCallback } from "https://deno.land/x/grammy@v1.21.1/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { upsertUser } from "./utils.ts";
+import { upsertUser, formatBinderList } from "./utils.ts";
 
 const bot = new Bot(Deno.env.get("TELEGRAM_BOT_TOKEN")!);
 
@@ -18,7 +18,9 @@ bot.command("start", async (ctx) => {
   await ctx.reply(
     "👋 Welcome to League Binder Bot!\n\n" +
     "Commands:\n" +
-    "/register <moxfield_binder_url> — Add your binder"
+    "/register <moxfield_binder_url> — Add your binder\n" +
+    "/mybinders — List your registered binders\n" +
+    "/removebinder <url> — Remove a binder"
   );
 });
 
@@ -44,6 +46,41 @@ bot.command("register", async (ctx) => {
   }
   if (error) throw error;
   await ctx.reply(`✅ Binder registered! It will be scraped in the next daily run.\n${url}`);
+});
+
+bot.command("mybinders", async (ctx) => {
+  if (!ctx.from) { await ctx.reply("Cannot identify sender."); return; }
+
+  const { data, error } = await supabase
+    .from("binders")
+    .select("url, last_scraped_at")
+    .eq("user_id", ctx.from.id)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    await ctx.reply("You have no registered binders. Use /register <url> to add one.");
+    return;
+  }
+
+  await ctx.reply(formatBinderList(data));
+});
+
+bot.command("removebinder", async (ctx) => {
+  if (!ctx.from) { await ctx.reply("Cannot identify sender."); return; }
+
+  const url = ctx.match?.trim();
+  if (!url) {
+    await ctx.reply("Usage: /removebinder <url>");
+    return;
+  }
+  const { error } = await supabase
+    .from("binders")
+    .delete()
+    .eq("user_id", ctx.from.id)
+    .eq("url", url);
+  if (error) throw error;
+  await ctx.reply(`🗑️ Binder removed (if it existed): ${url}`);
 });
 
 bot.catch((err) => {

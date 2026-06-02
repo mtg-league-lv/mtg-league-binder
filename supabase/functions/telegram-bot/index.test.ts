@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { upsertUser } from "./utils.ts";
+import { upsertUser, formatBinderList } from "./utils.ts";
 
 Deno.test("upsertUser builds correct row", async () => {
   const calls: unknown[] = [];
@@ -32,4 +32,18 @@ Deno.test("upsertUser throws on error", async () => {
     assertEquals(e, fakeError);
   }
   assertEquals(threw, true);
+});
+
+Deno.test("formatBinderList formats list correctly", () => {
+  const binders = [
+    { url: "https://moxfield.com/binders/AAA", last_scraped_at: "2026-06-01T03:00:00Z" },
+    { url: "https://moxfield.com/binders/BBB", last_scraped_at: null },
+  ];
+  const msg = formatBinderList(binders);
+  assertEquals(
+    msg,
+    "Your binders:\n\n" +
+    "1. https://moxfield.com/binders/AAA\n   Last scraped: Mon, 01 Jun 2026 03:00:00 GMT\n\n" +
+    "2. https://moxfield.com/binders/BBB\n   Not yet scraped"
+  );
 });
