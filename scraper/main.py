@@ -76,6 +76,9 @@ def scrape_binder(url: str) -> list[dict]:
         Stealth().apply_stealth_sync(page)
 
         def handle_response(response):
+            # Log all moxfield API responses for diagnostics
+            if "moxfield" in response.url and response.status in (200, 403):
+                log.info("RESPONSE %s %s", response.status, response.url[:120])
             # Match the trade-binders search endpoint
             if (
                 "trade-binders" in response.url
@@ -88,6 +91,8 @@ def scrape_binder(url: str) -> list[dict]:
                     if cards:
                         all_cards.extend(cards)
                         log.info("Intercepted %s cards from %s", len(cards), response.url[:80])
+                    else:
+                        log.warning("Intercepted response but parsed 0 cards. Keys: %s", list(data.keys()) if isinstance(data, dict) else type(data))
                 except Exception as exc:
                     log.warning("Failed to parse intercepted response: %s", exc)
 
