@@ -70,17 +70,24 @@ bot.command("removebinder", async (ctx) => {
   if (!ctx.from) { await ctx.reply("Cannot identify sender."); return; }
 
   const url = ctx.match?.trim();
-  if (!url) {
-    await ctx.reply("Usage: /removebinder <url>");
+  if (!url || !MOXFIELD_BINDER_RE.test(url)) {
+    await ctx.reply("Please provide a valid Moxfield binder URL.\nUsage: /removebinder <url>\nTip: use /mybinders to see your registered binders.");
     return;
   }
-  const { error } = await supabase
+
+  const { error, count } = await supabase
     .from("binders")
-    .delete()
+    .delete({ count: "exact" })
     .eq("user_id", ctx.from.id)
     .eq("url", url);
+
   if (error) throw error;
-  await ctx.reply(`🗑️ Binder removed (if it existed): ${url}`);
+
+  if (count === 0 || count === null) {
+    await ctx.reply("No binder found with that URL in your account.");
+  } else {
+    await ctx.reply(`🗑️ Binder removed: ${url}`);
+  }
 });
 
 bot.catch((err) => {
