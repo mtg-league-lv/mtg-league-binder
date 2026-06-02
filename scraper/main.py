@@ -121,9 +121,14 @@ def sync_binder(client: Client, binder_id: str, url: str) -> None:
         log.warning("Binder %s returned 0 cards — skipping card update to preserve existing data", binder_id)
         return
 
+    # Deduplicate by card_name, summing quantities for multiple printings
+    merged: dict[str, int] = {}
+    for c in cards:
+        merged[c["card_name"]] = merged.get(c["card_name"], 0) + c["quantity"]
+
     client.from_("binder_cards").delete().eq("binder_id", binder_id).execute()
-    rows = [{"binder_id": binder_id, **c} for c in cards]
-    client.from_("binder_cards").upsert(rows, on_conflict="binder_id,card_name").execute()
+    rows = [{"binder_id": binder_id, "card_name": name, "quantity": qty} for name, qty in merged.items()]
+    client.from_("binder_cards").insert(rows).execute()
     log.info("  Done: %s cards upserted", len(cards))
 
 
