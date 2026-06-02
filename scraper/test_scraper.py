@@ -1,7 +1,7 @@
 # scraper/test_scraper.py
 import pytest
 from unittest.mock import patch, MagicMock
-from main import extract_binder_id, parse_cards, scrape_binder
+from main import extract_binder_id, parse_cards
 
 
 def test_extract_binder_id_standard_url():
@@ -46,32 +46,33 @@ def test_parse_cards_missing_boards():
     assert parse_cards({}) == []
 
 
-def test_scrape_binder_passes_user_agent():
-    mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "boards": {
-            "mainboard": {
-                "cards": {
-                    "c1": {"quantity": 1, "card": {"name": "Lightning Bolt"}}
-                }
-            }
-        }
-    }
-    mock_response.raise_for_status = MagicMock()
+def test_scrape_binder_uses_playwright():
+    """Verify scrape_binder launches Playwright and returns parsed cards."""
+    mock_page = MagicMock()
+    mock_page.evaluate.return_value = [
+        {"name": "Lightning Bolt", "qty": 3},
+        {"name": "Black Lotus", "qty": 1},
+    ]
+    mock_page.goto = MagicMock()
+    mock_page.wait_for_selector = MagicMock()
 
-    with patch("httpx.get", return_value=mock_response) as mock_get:
+    mock_context = MagicMock()
+    mock_context.new_page.return_value = mock_page
+
+    mock_browser = MagicMock()
+    mock_browser.new_context.return_value = mock_context
+
+    mock_chromium = MagicMock()
+    mock_chromium.launch.return_value = mock_browser
+
+    mock_playwright = MagicMock()
+    mock_playwright.__enter__ = MagicMock(return_value=mock_playwright)
+    mock_playwright.__exit__ = MagicMock(return_value=False)
+    mock_playwright.chromium = mock_chromium
+
+    with patch("main.sync_playwright", return_value=mock_playwright):
+        from main import scrape_binder
         result = scrape_binder("https://moxfield.com/binders/ABC123")
 
-    call_kwargs = mock_get.call_args
-    assert call_kwargs.kwargs["headers"]["User-Agent"] == "LeagueBinderBot/1.0"
-    mock_response.raise_for_status.assert_called_once()
-    assert result == [{"card_name": "lightning bolt", "quantity": 1}]
-
-
-def test_scrape_binder_raises_on_http_error():
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = Exception("HTTP 404")
-
-    with patch("httpx.get", return_value=mock_response):
-        with pytest.raises(Exception, match="HTTP 404"):
-            scrape_binder("https://moxfield.com/binders/ABC123")
+    assert {"card_name": "lightning bolt", "quantity": 3} in result
+    assert {"card_name": "black lotus", "quantity": 1} in result
