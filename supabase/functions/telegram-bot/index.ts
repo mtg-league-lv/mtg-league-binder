@@ -118,7 +118,7 @@ bot.command("search", async (ctx) => {
   const typed = data as Array<{
     card_name: string;
     quantity: number;
-    binders: { url: string; users: { username: string | null } };
+    binders: { url: string; username: string | null; users: { username: string | null } };
   }>;
 
   await ctx.reply(formatSearchResults(query, typed));
