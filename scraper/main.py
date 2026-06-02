@@ -123,7 +123,7 @@ def sync_binder(client: Client, binder_id: str, url: str) -> None:
 
     client.from_("binder_cards").delete().eq("binder_id", binder_id).execute()
     rows = [{"binder_id": binder_id, **c} for c in cards]
-    client.from_("binder_cards").insert(rows).execute()
+    client.from_("binder_cards").upsert(rows, on_conflict="binder_id,card_name").execute()
     log.info("  Done: %s cards upserted", len(cards))
 
 
