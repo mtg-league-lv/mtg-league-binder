@@ -100,11 +100,13 @@ bot.command("search", async (ctx) => {
     return;
   }
 
+  const escaped = query.toLowerCase().replace(/[%_\\]/g, "\\$&");
   const { data, error } = await supabase
     .from("binder_cards")
     .select("card_name, quantity, binders(url, users(username))")
-    .ilike("card_name", `%${query.toLowerCase()}%`)
-    .order("card_name");
+    .ilike("card_name", `%${escaped}%`)
+    .order("card_name")
+    .limit(50);
 
   if (error) throw error;
 

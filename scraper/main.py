@@ -42,24 +42,25 @@ def scrape_binder(url: str) -> list[dict]:
 
 
 def sync_binder(client: Client, binder_id: str, url: str) -> None:
-    log.info(f"Scraping binder {binder_id} ({url})")
+    log.info("Scraping binder %s (%s)", binder_id, url)
     try:
         cards = scrape_binder(url)
     except Exception as exc:
-        log.warning(f"Skipping binder {binder_id}: {exc}")
+        log.warning("Skipping binder %s: %s", binder_id, exc)
         return
 
+    # Always update last_scraped_at so operators can see this binder was attempted
+    client.from_("binders").update({"last_scraped_at": datetime.now(timezone.utc).isoformat()}).eq("id", binder_id).execute()
+
     if not cards:
-        log.warning(f"Binder {binder_id} returned 0 cards — skipping update to preserve existing data")
+        log.warning("Binder %s returned 0 cards — skipping card update to preserve existing data", binder_id)
         return
 
     # Full replace: delete then insert
     client.from_("binder_cards").delete().eq("binder_id", binder_id).execute()
     rows = [{"binder_id": binder_id, **c} for c in cards]
     client.from_("binder_cards").insert(rows).execute()
-
-    client.from_("binders").update({"last_scraped_at": datetime.now(timezone.utc).isoformat()}).eq("id", binder_id).execute()
-    log.info(f"  Done: {len(cards)} cards upserted")
+    log.info("  Done: %s cards upserted", len(cards))
 
 
 def main() -> None:
@@ -69,7 +70,7 @@ def main() -> None:
 
     response = client.from_("binders").select("id, url").execute()
     binders = response.data or []
-    log.info(f"Found {len(binders)} binders to scrape")
+    log.info("Found %s binders to scrape", len(binders))
 
     for binder in binders:
         sync_binder(client, binder["id"], binder["url"])
