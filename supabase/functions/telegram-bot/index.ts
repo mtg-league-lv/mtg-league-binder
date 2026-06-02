@@ -1,4 +1,4 @@
-import { Bot, webhookCallback } from "https://deno.land/x/grammy@v1.21.1/mod.ts";
+import { Bot, webhookCallback } from "npm:grammy@1.21.1";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { upsertUser, formatBinderList, formatSearchResults } from "./utils.ts";
 
