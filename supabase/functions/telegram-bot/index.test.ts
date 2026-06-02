@@ -50,7 +50,7 @@ Deno.test("formatSearchResults produces correct output", () => {
   const msg = formatSearchResults("Black Lotus", results);
   assertEquals(
     msg,
-    "🃏 Black Lotus\n──────────────\n@alice — Black Lotus — 2x\n🔗 https://moxfield.com/binders/AAA\n\nunknown — Black Lotus — 1x\n🔗 https://moxfield.com/binders/BBB"
+    "🃏 Black Lotus\n──────────────\n@alice — 2x Black Lotus\n🔗 https://moxfield.com/binders/AAA\n\nunknown — 1x Black Lotus\n🔗 https://moxfield.com/binders/BBB"
   );
 });
 
