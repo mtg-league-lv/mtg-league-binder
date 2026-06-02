@@ -2,8 +2,7 @@ import os
 import re
 import logging
 from datetime import datetime, timezone
-from playwright.sync_api import sync_playwright
-from playwright_stealth import Stealth
+from patchright.sync_api import sync_playwright
 from supabase import create_client, Client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -60,11 +59,7 @@ def scrape_binder(url: str) -> list[dict]:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-            ],
+            args=["--no-sandbox", "--disable-dev-shm-usage"],
         )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -73,13 +68,10 @@ def scrape_binder(url: str) -> list[dict]:
             timezone_id="America/New_York",
         )
         page = context.new_page()
-        Stealth().apply_stealth_sync(page)
 
         def handle_response(response):
-            # Log all moxfield API responses for diagnostics
             if "moxfield" in response.url and response.status in (200, 403):
                 log.info("RESPONSE %s %s", response.status, response.url[:120])
-            # Match the trade-binders search endpoint
             if (
                 "trade-binders" in response.url
                 and binder_id in response.url
@@ -100,7 +92,6 @@ def scrape_binder(url: str) -> list[dict]:
 
         log.info("Navigating to %s", url)
         page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        # Wait for the React app to load and fire API calls
         page.wait_for_timeout(8000)
 
         context.close()

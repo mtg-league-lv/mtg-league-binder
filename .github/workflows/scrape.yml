@@ -48,8 +48,8 @@ jobs:
             libxkbcommon0 \
             libxrandr2
 
-      - name: Install Playwright browsers
-        run: playwright install chromium
+      - name: Install Patchright browsers
+        run: patchright install chromium
 
       - name: Run scraper
         env:
