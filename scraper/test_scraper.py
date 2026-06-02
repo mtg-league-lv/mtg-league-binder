@@ -1,6 +1,7 @@
 # scraper/test_scraper.py
 import pytest
-from main import extract_binder_id, parse_cards
+from unittest.mock import patch, MagicMock
+from main import extract_binder_id, parse_cards, scrape_binder
 
 
 def test_extract_binder_id_standard_url():
@@ -43,3 +44,34 @@ def test_parse_cards_empty_binder():
 
 def test_parse_cards_missing_boards():
     assert parse_cards({}) == []
+
+
+def test_scrape_binder_passes_user_agent():
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "boards": {
+            "mainboard": {
+                "cards": {
+                    "c1": {"quantity": 1, "card": {"name": "Lightning Bolt"}}
+                }
+            }
+        }
+    }
+    mock_response.raise_for_status = MagicMock()
+
+    with patch("httpx.get", return_value=mock_response) as mock_get:
+        result = scrape_binder("https://moxfield.com/binders/ABC123")
+
+    call_kwargs = mock_get.call_args
+    assert call_kwargs.kwargs["headers"]["User-Agent"] == "LeagueBinderBot/1.0"
+    mock_response.raise_for_status.assert_called_once()
+    assert result == [{"card_name": "lightning bolt", "quantity": 1}]
+
+
+def test_scrape_binder_raises_on_http_error():
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = Exception("HTTP 404")
+
+    with patch("httpx.get", return_value=mock_response):
+        with pytest.raises(Exception, match="HTTP 404"):
+            scrape_binder("https://moxfield.com/binders/ABC123")

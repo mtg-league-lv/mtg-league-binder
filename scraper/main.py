@@ -1,6 +1,7 @@
 import os
 import re
 import logging
+from datetime import datetime, timezone
 import httpx
 from supabase import create_client, Client
 
@@ -48,14 +49,16 @@ def sync_binder(client: Client, binder_id: str, url: str) -> None:
         log.warning(f"Skipping binder {binder_id}: {exc}")
         return
 
+    if not cards:
+        log.warning(f"Binder {binder_id} returned 0 cards — skipping update to preserve existing data")
+        return
+
     # Full replace: delete then insert
     client.from_("binder_cards").delete().eq("binder_id", binder_id).execute()
+    rows = [{"binder_id": binder_id, **c} for c in cards]
+    client.from_("binder_cards").insert(rows).execute()
 
-    if cards:
-        rows = [{"binder_id": binder_id, **c} for c in cards]
-        client.from_("binder_cards").insert(rows).execute()
-
-    client.from_("binders").update({"last_scraped_at": "now()"}).eq("id", binder_id).execute()
+    client.from_("binders").update({"last_scraped_at": datetime.now(timezone.utc).isoformat()}).eq("id", binder_id).execute()
     log.info(f"  Done: {len(cards)} cards upserted")
 
 
