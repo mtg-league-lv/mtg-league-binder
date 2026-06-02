@@ -1,4 +1,4 @@
 playwright==1.44.0
-playwright-stealth==1.0.6
+playwright-stealth==2.0.3
 supabase==2.4.6
 pytest==8.2.0
