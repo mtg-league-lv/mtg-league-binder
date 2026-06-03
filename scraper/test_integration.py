@@ -3,7 +3,7 @@ Integration tests — require live internet access.
 Run with: pytest scraper/test_integration.py -v
 """
 import pytest
-from main import scrape_binder, extract_binder_id
+from scrapers.moxfield import scrape as scrape_binder, extract_binder_id
 
 
 BINDER_URL = "https://moxfield.com/binders/FI4YNpJD40aTDf2_8vUExg"
