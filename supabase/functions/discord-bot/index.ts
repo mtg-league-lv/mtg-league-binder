@@ -167,6 +167,9 @@ export async function handleInteraction(
       if (!query) {
         return reply("Usage: /search <card name>\nExample: /search Black Lotus");
       }
+      if (query.length > 100) {
+        return reply("Search query is too long (max 100 characters).");
+      }
       const escaped = query.toLowerCase().replace(/[%_\\]/g, "\\$&");
       const { data, error } = await supabase
         .from("binder_cards")
@@ -180,6 +183,8 @@ export async function handleInteraction(
       }
       return reply(formatSearchResults(query, data as Array<SearchResult>));
     }
+
+    return reply("Unknown command.");
   }
 
   return new Response("OK", { status: 200 });
@@ -201,6 +206,11 @@ Deno.serve(async (req: Request) => {
   const valid = await verifyDiscordRequest(sig, ts, rawBody, publicKey);
   if (!valid) return new Response("Unauthorized", { status: 401 });
 
-  const interaction = JSON.parse(rawBody) as Record<string, unknown>;
+  let interaction: Record<string, unknown>;
+  try {
+    interaction = JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    return new Response("Bad Request", { status: 400 });
+  }
   return handleInteraction(interaction, supabase);
 });
