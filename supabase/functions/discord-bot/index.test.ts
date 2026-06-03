@@ -98,6 +98,8 @@ Deno.test("/register with valid URL inserts and confirms", async () => {
   assertEquals(body.type, 4);
   assertEquals(body.data.content.includes("✅"), true);
   assertEquals(inserts.length, 1);
+  const inserted = (inserts[0] as { table: string; row: Record<string, unknown> }).row;
+  assertEquals(inserted.url, "https://moxfield.com/binders/ABC123");
 });
 
 Deno.test("/register with invalid URL replies with usage message", async () => {
@@ -233,6 +235,37 @@ Deno.test("/removebinder with invalid URL replies with usage message", async () 
   const res = await handleInteraction(interaction, fakeSupabase as never);
   const body = await res.json();
   assertEquals(body.data.content.includes("valid Moxfield"), true);
+});
+
+Deno.test("/removebinder when binder not found replies with not-found message", async () => {
+  const fakeSupabase = {
+    from: (table: string) => {
+      if (table === "users") {
+        return {
+          select: (_cols: string) => ({
+            eq: (_col: string, _val: unknown) => ({
+              single: () => Promise.resolve({ data: { id: 99 }, error: null }),
+            }),
+          }),
+        };
+      }
+      // binders table
+      return {
+        delete: (_opts: unknown) => ({
+          eq: (_col: string, _val: unknown) => ({
+            eq: (_col2: string, _val2: unknown) =>
+              Promise.resolve({ error: null, count: 0 }),
+          }),
+        }),
+      };
+    },
+  };
+  const interaction = makeInteraction("removebinder", [
+    { name: "url", value: "https://moxfield.com/binders/NOTMINE" },
+  ]);
+  const res = await handleInteraction(interaction, fakeSupabase as never);
+  const body = await res.json();
+  assertEquals(body.data.content.includes("No binder found"), true);
 });
 
 // ── /search ───────────────────────────────────────────────────────────────────
