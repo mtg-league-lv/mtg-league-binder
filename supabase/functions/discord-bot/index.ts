@@ -197,5 +197,13 @@ Deno.serve(async (req: Request) => {
   } catch {
     return new Response("Bad Request", { status: 400 });
   }
-  return handleInteraction(interaction, supabase);
+  try {
+    return await handleInteraction(interaction, supabase);
+  } catch (e) {
+    console.error("Discord bot error:", e);
+    return new Response(
+      JSON.stringify({ type: 4, data: { content: "An internal error occurred. Please try again later." } }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  }
 });
