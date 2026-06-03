@@ -1,1 +1,11 @@
 .claude/settings.local.json
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Local debug scripts
+scraper/diagnose.py
+
+# Supabase CLI temp files
+supabase/.temp/
