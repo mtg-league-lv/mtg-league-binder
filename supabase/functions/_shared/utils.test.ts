@@ -40,6 +40,20 @@ Deno.test("upsertUser throws on error", async () => {
   assertEquals(threw, true);
 });
 
+Deno.test("upsertUser uses null when username undefined", async () => {
+  const calls: unknown[] = [];
+  const fakeClient = {
+    from: (_: string) => ({
+      upsert: (row: unknown, _opts: unknown) => {
+        calls.push(row);
+        return Promise.resolve({ error: null });
+      },
+    }),
+  };
+  await upsertUser(fakeClient as never, 999, undefined);
+  assertEquals(calls[0], { id: 999, username: null });
+});
+
 // ── upsertDiscordUser ─────────────────────────────────────────────────────────
 
 Deno.test("upsertDiscordUser builds correct row", async () => {
