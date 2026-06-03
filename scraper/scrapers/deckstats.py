@@ -1,6 +1,7 @@
 # scraper/scrapers/deckstats.py
 import re
 import logging
+import urllib.parse
 from patchright.sync_api import sync_playwright
 from .base import launch_browser
 
@@ -89,7 +90,6 @@ def scrape(url: str) -> list[dict]:
             # Fetch remaining pages via page.request (uses session cookies)
             if total_records and total_records > PAGE_SIZE and first_api_url:
                 # Derive base URL by stripping iDisplayStart from the intercepted URL
-                import urllib.parse
                 parsed = urllib.parse.urlparse(first_api_url)
                 params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
                 # Remove iDisplayStart so we can set it ourselves
