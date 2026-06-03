@@ -25,7 +25,8 @@ bot.command("start", async (ctx) => {
   );
 });
 
-const MOXFIELD_BINDER_RE = /^https:\/\/moxfield\.com\/binders\/[A-Za-z0-9_-]+/;
+const BINDER_URL_RE =
+  /^https:\/\/(moxfield\.com\/binders\/[A-Za-z0-9_-]+|deckstats\.net\/collection\/\d+)/;
 
 bot.command("register", async (ctx) => {
   if (!ctx.from) {
@@ -33,7 +34,7 @@ bot.command("register", async (ctx) => {
     return;
   }
   const url = ctx.match?.trim();
-  if (!url || !MOXFIELD_BINDER_RE.test(url)) {
+  if (!url || !BINDER_URL_RE.test(url)) {
     await ctx.reply("Please provide a valid Moxfield binder URL.\nExample: /register https://moxfield.com/binders/ABC123");
     return;
   }
@@ -71,7 +72,7 @@ bot.command("removebinder", async (ctx) => {
   if (!ctx.from) { await ctx.reply("Cannot identify sender."); return; }
 
   const url = ctx.match?.trim();
-  if (!url || !MOXFIELD_BINDER_RE.test(url)) {
+  if (!url || !BINDER_URL_RE.test(url)) {
     await ctx.reply("Please provide a valid Moxfield binder URL.\nUsage: /removebinder <url>\nTip: use /mybinders to see your registered binders.");
     return;
   }
