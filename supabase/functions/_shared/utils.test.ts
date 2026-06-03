@@ -56,7 +56,7 @@ Deno.test("upsertUser uses null when username undefined", async () => {
 
 // ── upsertDiscordUser ─────────────────────────────────────────────────────────
 
-Deno.test("upsertDiscordUser builds correct row", async () => {
+Deno.test("upsertDiscordUser builds correct row with deterministic id", async () => {
   const calls: unknown[] = [];
   const fakeClient = {
     from: (_: string) => ({
@@ -66,8 +66,13 @@ Deno.test("upsertDiscordUser builds correct row", async () => {
       },
     }),
   };
-  await upsertDiscordUser(fakeClient as never, "123456789012345678", "bob");
-  assertEquals(calls[0], { discord_id: "123456789012345678", discord_username: "bob" });
+  const id = await upsertDiscordUser(fakeClient as never, "123456789012345678", "bob");
+  const row = calls[0] as Record<string, unknown>;
+  assertEquals(row.discord_id, "123456789012345678");
+  assertEquals(row.discord_username, "bob");
+  assertEquals(typeof row.id, "number");
+  assertEquals((row.id as number) < 0, true);
+  assertEquals(id, row.id);
 });
 
 Deno.test("upsertDiscordUser uses null when username undefined", async () => {
@@ -80,8 +85,10 @@ Deno.test("upsertDiscordUser uses null when username undefined", async () => {
       },
     }),
   };
-  await upsertDiscordUser(fakeClient as never, "111", undefined);
-  assertEquals(calls[0], { discord_id: "111", discord_username: null });
+  await upsertDiscordUser(fakeClient as never, "111000000000000000", undefined);
+  const row = calls[0] as Record<string, unknown>;
+  assertEquals(row.discord_username, null);
+  assertEquals((row.id as number) < 0, true);
 });
 
 Deno.test("upsertDiscordUser throws on error", async () => {

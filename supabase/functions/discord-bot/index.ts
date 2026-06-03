@@ -99,10 +99,10 @@ export async function handleInteraction(
           "Please provide a valid Moxfield binder URL.\nExample: /register https://moxfield.com/binders/ABC123"
         );
       }
-      await upsertDiscordUser(supabase, user.id, user.username);
+      const userId = await upsertDiscordUser(supabase, user.id, user.username);
       const { error } = await supabase
         .from("binders")
-        .insert({ user_id: null, url });
+        .insert({ user_id: userId, url });
       if (error?.code === "23505") {
         return reply("That binder is already registered.");
       }
@@ -112,19 +112,11 @@ export async function handleInteraction(
 
     // /mybinders
     if (commandName === "mybinders") {
-      await upsertDiscordUser(supabase, user.id, user.username);
-      const { data: userData, error: userErr } = await supabase
-        .from("users")
-        .select("id")
-        .eq("discord_id", user.id)
-        .single();
-      if (userErr || !userData) {
-        return reply("You have no registered binders. Use /register <url> to add one.");
-      }
+      const userId = await upsertDiscordUser(supabase, user.id, user.username);
       const { data, error } = await supabase
         .from("binders")
         .select("url, last_scraped_at")
-        .eq("user_id", userData.id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: true });
       if (error) throw error;
       if (!data || data.length === 0) {
@@ -141,18 +133,11 @@ export async function handleInteraction(
           "Please provide a valid Moxfield binder URL.\nUsage: /removebinder <url>"
         );
       }
-      const { data: userData } = await supabase
-        .from("users")
-        .select("id")
-        .eq("discord_id", user.id)
-        .single();
-      if (!userData) {
-        return reply("No binder found with that URL in your account.");
-      }
+      const userId = await upsertDiscordUser(supabase, user.id, user.username);
       const { error, count } = await supabase
         .from("binders")
         .delete({ count: "exact" })
-        .eq("user_id", userData.id)
+        .eq("user_id", userId)
         .eq("url", url);
       if (error) throw error;
       if (count === 0 || count === null) {

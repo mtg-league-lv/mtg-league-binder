@@ -58,12 +58,22 @@ export async function upsertDiscordUser(
   client: SupabaseClient,
   discordId: string,
   discordUsername: string | undefined
-) {
+): Promise<number> {
+  // Derive a deterministic negative integer ID for Discord-only users.
+  // Discord snowflakes are positive 64-bit integers. We take the last 15
+  // digits mod 10^15 and negate, guaranteeing no collision with positive
+  // Telegram IDs. This is stable across calls for the same discord ID.
+  const deterministicId = -(Number(BigInt(discordId) % 1_000_000_000_000_000n));
   const { error } = await client
     .from("users")
     .upsert(
-      { discord_id: discordId, discord_username: discordUsername ?? null },
+      {
+        id: deterministicId,
+        discord_id: discordId,
+        discord_username: discordUsername ?? null,
+      },
       { onConflict: "discord_id" }
     );
   if (error) throw error;
+  return deterministicId;
 }

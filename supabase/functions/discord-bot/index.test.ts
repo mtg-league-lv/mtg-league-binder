@@ -137,14 +137,8 @@ Deno.test("/mybinders with no binders replies with empty-state message", async (
       if (table === "users") {
         return {
           upsert: (_row: unknown, _opts: unknown) => Promise.resolve({ error: null }),
-          select: (_cols: string) => ({
-            eq: (_col: string, _val: unknown) => ({
-              single: () => Promise.resolve({ data: { id: 99 }, error: null }),
-            }),
-          }),
         };
       }
-      // binders
       return {
         select: (_cols: string) => ({
           eq: (_col: string, _val: unknown) => ({
@@ -170,14 +164,8 @@ Deno.test("/mybinders with binders returns formatted list", async () => {
       if (table === "users") {
         return {
           upsert: (_row: unknown, _opts: unknown) => Promise.resolve({ error: null }),
-          select: (_cols: string) => ({
-            eq: (_col: string, _val: unknown) => ({
-              single: () => Promise.resolve({ data: { id: 99 }, error: null }),
-            }),
-          }),
         };
       }
-      // binders
       return {
         select: (_cols: string) => ({
           eq: (_col: string, _val: unknown) => ({
@@ -201,14 +189,9 @@ Deno.test("/removebinder with valid URL removes and confirms", async () => {
     from: (table: string) => {
       if (table === "users") {
         return {
-          select: (_cols: string) => ({
-            eq: (_col: string, _val: unknown) => ({
-              single: () => Promise.resolve({ data: { id: 99 }, error: null }),
-            }),
-          }),
+          upsert: (_row: unknown, _opts: unknown) => Promise.resolve({ error: null }),
         };
       }
-      // binders
       return {
         delete: (_opts: unknown) => ({
           eq: (_col: string, _val: unknown) => ({
@@ -242,14 +225,9 @@ Deno.test("/removebinder when binder not found replies with not-found message", 
     from: (table: string) => {
       if (table === "users") {
         return {
-          select: (_cols: string) => ({
-            eq: (_col: string, _val: unknown) => ({
-              single: () => Promise.resolve({ data: { id: 99 }, error: null }),
-            }),
-          }),
+          upsert: (_row: unknown, _opts: unknown) => Promise.resolve({ error: null }),
         };
       }
-      // binders table
       return {
         delete: (_opts: unknown) => ({
           eq: (_col: string, _val: unknown) => ({
