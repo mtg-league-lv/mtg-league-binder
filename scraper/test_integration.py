@@ -54,3 +54,11 @@ def test_deckstats_card_structure():
         assert card["card_name"] == card["card_name"].lower(), "card_name must be lowercase"
         assert isinstance(card["quantity"], int)
         assert card["quantity"] >= 1
+
+
+def test_deckstats_binder_has_more_than_300_cards():
+    """Collection 45416 has 481 cards — verify full pagination returns 300+."""
+    cards = scrape_deckstats(DECKSTATS_URL)
+    assert len(cards) > 300, (
+        f"Expected more than 300 cards from deckstats collection, got {len(cards)}"
+    )
