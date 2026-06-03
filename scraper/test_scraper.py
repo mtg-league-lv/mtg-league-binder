@@ -1,7 +1,7 @@
 # scraper/test_scraper.py
 import pytest
 from unittest.mock import patch, MagicMock, call
-from main import extract_binder_id, parse_cards
+from scrapers.moxfield import extract_binder_id, parse_cards
 
 
 def test_extract_binder_id_standard_url():
@@ -92,8 +92,8 @@ def test_scrape_binder_intercepts_trade_binder_api():
     mock_pw.__exit__ = MagicMock(return_value=False)
     mock_pw.chromium.launch.return_value = mock_browser
 
-    with patch("main.sync_playwright", return_value=mock_pw):
-        from main import scrape_binder
+    with patch("scrapers.moxfield.sync_playwright", return_value=mock_pw):
+        from scrapers.moxfield import scrape as scrape_binder
 
         def run_scrape():
             # Simulate the page load firing the intercepted API response
