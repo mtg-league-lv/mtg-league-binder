@@ -103,7 +103,7 @@ bot.command("search", async (ctx) => {
   const escaped = query.toLowerCase().replace(/[%_\\]/g, "\\$&");
   const { data, error } = await supabase
     .from("binder_cards")
-    .select("card_name, quantity, binders(url, username, users(username))")
+    .select("card_name, quantity, binders(url, username, users(username, discord_username))")
     .ilike("card_name", `%${escaped}%`)
     .order("card_name")
     .limit(50);
@@ -118,7 +118,7 @@ bot.command("search", async (ctx) => {
   const typed = data as Array<{
     card_name: string;
     quantity: number;
-    binders: { url: string; username: string | null; users: { username: string | null } };
+    binders: { url: string; username: string | null; users: { username: string | null; discord_username: string | null } | null };
   }>;
 
   await ctx.reply(formatSearchResults(query, typed));
