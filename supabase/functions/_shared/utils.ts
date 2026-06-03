@@ -63,7 +63,8 @@ export async function upsertDiscordUser(
   // Discord snowflakes are positive 64-bit integers. We take the last 15
   // digits mod 10^15 and negate, guaranteeing no collision with positive
   // Telegram IDs. This is stable across calls for the same discord ID.
-  const deterministicId = -(Number(BigInt(discordId) % 1_000_000_000_000_000n));
+  const mod = Number(BigInt(discordId) % 1_000_000_000_000_000n);
+  const deterministicId = -(mod === 0 ? 1 : mod);
   const { error } = await client
     .from("users")
     .upsert(
