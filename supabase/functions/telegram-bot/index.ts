@@ -35,17 +35,41 @@ bot.command("register", async (ctx) => {
   }
   const url = ctx.match?.trim();
   if (!url || !BINDER_URL_RE.test(url)) {
-    await ctx.reply("Please provide a valid Moxfield binder URL.\nExample: /register https://moxfield.com/binders/ABC123");
+    await ctx.reply("Please provide a valid binder URL.\nExamples:\n/register https://moxfield.com/binders/ABC123\n/register https://deckstats.net/collection/12345");
     return;
   }
   await upsertUser(supabase, ctx.from.id, ctx.from.username);
+
+  // Check if binder already exists
+  const { data: existing, error: fetchError } = await supabase
+    .from("binders")
+    .select("id, user_id")
+    .eq("url", url)
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+
+  if (existing) {
+    if (existing.user_id === ctx.from.id) {
+      await ctx.reply("That binder is already registered to your account.");
+      return;
+    }
+    if (existing.user_id === null) {
+      // Unowned binder — claim it
+      const { error: claimError } = await supabase
+        .from("binders")
+        .update({ user_id: ctx.from.id })
+        .eq("id", existing.id);
+      if (claimError) throw claimError;
+      await ctx.reply(`✅ Binder linked to your account!\n${url}`);
+      return;
+    }
+    await ctx.reply("That binder is already registered to another account.");
+    return;
+  }
+
   const { error } = await supabase
     .from("binders")
     .insert({ user_id: ctx.from.id, url });
-  if (error?.code === "23505") {
-    await ctx.reply("That binder is already registered to your account.");
-    return;
-  }
   if (error) throw error;
   await ctx.reply(`✅ Binder registered! It will be scraped in the next daily run.\n${url}`);
 });
