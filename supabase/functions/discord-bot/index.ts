@@ -1,4 +1,7 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Supabase Edge Runtime global — keeps function alive after response is sent
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 import {
   upsertDiscordUser,
   formatBinderList,
@@ -189,9 +192,10 @@ export async function handleInteraction(
           await editOriginalResponse(token, "An error occurred while searching. Please try again.");
         }
       })();
-      // Keep the Edge Function alive until the follow-up is sent
+      // Keep the Edge Function alive until the follow-up is sent.
+      // EdgeRuntime is a Supabase global — declare it to avoid TS errors.
       // deno-lint-ignore no-explicit-any
-      (globalThis as any).EdgeRuntime?.waitUntil(searchPromise);
+      (EdgeRuntime as any).waitUntil(searchPromise);
       // Respond to Discord immediately with a deferred message ("is thinking…")
       return jsonResponse({ type: 5, data: { flags: 4 } });
     }
