@@ -126,7 +126,7 @@ Deno.test("formatSearchResults uses telegram username when available", () => {
   const msg = formatSearchResults("Black Lotus", results);
   assertEquals(
     msg,
-    "🃏 Black Lotus\n──────────────\n[@alice](https://moxfield.com/binders/AAA) — 2x Black Lotus"
+    "🃏 Black Lotus\n──────────────\n[@alice](https://moxfield.com/binders/AAA) — 2x [Black Lotus](https://scryfall.com/search?q=%21%22Black+Lotus%22)"
   );
 });
 
@@ -145,7 +145,7 @@ Deno.test("formatSearchResults falls back to discord username when no telegram u
   const msg = formatSearchResults("Black Lotus", results);
   assertEquals(
     msg,
-    "🃏 Black Lotus\n──────────────\n[@alice_dc](https://moxfield.com/binders/AAA) — 2x Black Lotus"
+    "🃏 Black Lotus\n──────────────\n[@alice_dc](https://moxfield.com/binders/AAA) — 2x [Black Lotus](https://scryfall.com/search?q=%21%22Black+Lotus%22)"
   );
 });
 
@@ -173,7 +173,7 @@ Deno.test("formatSearchResults falls back to binder username when no telegram or
   const msg = formatSearchResults("Black Lotus", results);
   assertEquals(
     msg,
-    "🃏 Black Lotus\n──────────────\n[Bob](https://moxfield.com/binders/BBB) — 1x Black Lotus\n\n[unknown](https://moxfield.com/binders/CCC) — 3x Black Lotus"
+    "🃏 Black Lotus\n──────────────\n[Bob](https://moxfield.com/binders/BBB) — 1x [Black Lotus](https://scryfall.com/search?q=%21%22Black+Lotus%22)\n\n[unknown](https://moxfield.com/binders/CCC) — 3x [Black Lotus](https://scryfall.com/search?q=%21%22Black+Lotus%22)"
   );
 });
 
@@ -192,7 +192,7 @@ Deno.test("formatSearchResults handles null users relation", () => {
   const msg = formatSearchResults("Black Lotus", results);
   assertEquals(
     msg,
-    "🃏 Black Lotus\n──────────────\n[Admin](https://moxfield.com/binders/DDD) — 1x Black Lotus"
+    "🃏 Black Lotus\n──────────────\n[Admin](https://moxfield.com/binders/DDD) — 1x [Black Lotus](https://scryfall.com/search?q=%21%22Black+Lotus%22)"
   );
 });
 

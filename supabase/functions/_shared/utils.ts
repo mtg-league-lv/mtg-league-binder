@@ -38,7 +38,8 @@ export function formatSearchResults(
       .split(" ")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
-    return `[${handle}](${r.binders.url}) — ${r.quantity}x ${cardName}`;
+    const scryfallUrl = `https://scryfall.com/search?q=%21%22${cardName.split(" ").join("+")}%22`;
+    return `[${handle}](${r.binders.url}) — ${r.quantity}x [${cardName}](${scryfallUrl})`;
   });
   return `🃏 ${query}\n──────────────\n` + lines.join("\n\n");
 }
