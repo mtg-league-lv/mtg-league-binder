@@ -47,7 +47,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function reply(content: string): Response {
-  return jsonResponse({ type: 4, data: { content } });
+  return jsonResponse({ type: 4, data: { content, flags: 4 } });
 }
 
 function getUser(
