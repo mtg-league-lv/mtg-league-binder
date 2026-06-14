@@ -38,7 +38,7 @@ export function formatSearchResults(
       .split(" ")
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
       .join(" ");
-    return `${handle} — ${r.quantity}x ${cardName}\n🔗 ${r.binders.url}`;
+    return `[${handle}](${r.binders.url}) — ${r.quantity}x ${cardName}`;
   });
   return `🃏 ${query}\n──────────────\n` + lines.join("\n\n");
 }
