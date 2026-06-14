@@ -1,7 +1,5 @@
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Supabase Edge Runtime global — keeps function alive after response is sent
-declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 import {
   upsertDiscordUser,
   formatBinderList,
@@ -78,16 +76,13 @@ const MOXFIELD_BINDER_RE = /^https:\/\/moxfield\.com\/binders\/[A-Za-z0-9_-]+/;
 
 // ── deferred follow-up ────────────────────────────────────────────────────────
 
-async function editOriginalResponse(token: string, content: string): Promise<void> {
-  const appId = Deno.env.get("DISCORD_APPLICATION_ID")!;
-  await fetch(
-    `https://discord.com/api/v10/webhooks/${appId}/${token}/messages/@original`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content, flags: 4 }),
-    }
-  );
+// Discord message content limit
+const DISCORD_MAX_LENGTH = 2000;
+
+function truncate(content: string): string {
+  if (content.length <= DISCORD_MAX_LENGTH) return content;
+  const suffix = "\n…(truncated)";
+  return content.slice(0, DISCORD_MAX_LENGTH - suffix.length) + suffix;
 }
 
 // ── command handlers ──────────────────────────────────────────────────────────
@@ -163,7 +158,7 @@ export async function handleInteraction(
       return reply(`🗑️ Binder removed: ${url}`);
     }
 
-    // /search — deferred to avoid Discord's 3-second timeout
+    // /search
     if (commandName === "search") {
       const query = getOption(interaction, "query")?.trim();
       if (!query) {
@@ -172,32 +167,18 @@ export async function handleInteraction(
       if (query.length > 100) {
         return reply("Search query is too long (max 100 characters).");
       }
-      const token = interaction.token as string;
-      const searchPromise = (async () => {
-        try {
-          const escaped = query.toLowerCase().replace(/[%_\\]/g, "\\$&");
-          const { data, error } = await supabase
-            .from("binder_cards")
-            .select("card_name, quantity, binders(url, username, users(username, discord_username))")
-            .ilike("card_name", `%${escaped}%`)
-            .order("card_name")
-            .limit(50);
-          if (error) throw error;
-          const content = (!data || data.length === 0)
-            ? `No binders found containing "${query}".`
-            : formatSearchResults(query, data as Array<SearchResult>);
-          await editOriginalResponse(token, content);
-        } catch (e) {
-          console.error("Search follow-up error:", e);
-          await editOriginalResponse(token, "An error occurred while searching. Please try again.");
-        }
-      })();
-      // Keep the Edge Function alive until the follow-up is sent.
-      // EdgeRuntime is a Supabase global — declare it to avoid TS errors.
-      // deno-lint-ignore no-explicit-any
-      (EdgeRuntime as any).waitUntil(searchPromise);
-      // Respond to Discord immediately with a deferred message ("is thinking…")
-      return jsonResponse({ type: 5, data: { flags: 4 } });
+      const escaped = query.toLowerCase().replace(/[%_\\]/g, "\\$&");
+      const { data, error } = await supabase
+        .from("binder_cards")
+        .select("card_name, quantity, binders(url, username, users(username, discord_username))")
+        .ilike("card_name", `%${escaped}%`)
+        .order("card_name")
+        .limit(50);
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        return reply(`No binders found containing "${query}".`);
+      }
+      return reply(truncate(formatSearchResults(query, data as Array<SearchResult>)));
     }
 
     return reply("Unknown command.");
