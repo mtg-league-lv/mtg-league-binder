@@ -88,7 +88,7 @@ def scrape(url: str) -> list[dict]:
             page.wait_for_timeout(10000)
 
             # Fetch remaining pages via page.request (uses session cookies)
-            if total_records and total_records > PAGE_SIZE and first_api_url:
+            if total_records and first_api_url:
                 # Derive base URL by stripping iDisplayStart from the intercepted URL
                 parsed = urllib.parse.urlparse(first_api_url)
                 params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
@@ -97,7 +97,11 @@ def scrape(url: str) -> list[dict]:
                 # Flatten single-value lists
                 flat_params = {k: v[0] for k, v in params.items()}
 
-                for start in range(PAGE_SIZE, total_records, PAGE_SIZE):
+                # Use the actual page size from the API URL, not a hardcoded constant
+                actual_page_size = int(flat_params.get("iDisplayLength", PAGE_SIZE))
+                log.info("Deckstats page size from API: %s, total records: %s", actual_page_size, total_records)
+
+                for start in range(actual_page_size, total_records, actual_page_size):
                     flat_params["iDisplayStart"] = str(start)
                     api_url = urllib.parse.urlunparse(
                         parsed._replace(query=urllib.parse.urlencode(flat_params))
