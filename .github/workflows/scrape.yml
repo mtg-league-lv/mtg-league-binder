@@ -49,10 +49,17 @@ jobs:
             libxrandr2
 
       - name: Install Patchright browsers
-        run: patchright install chromium
+        # Deckstats is served by CloudFlare, which 403s headless Chromium, so the
+        # deckstats scraper runs real Chrome in a window (under xvfb, below).
+        run: |
+          patchright install chromium
+          patchright install chrome
+
+      - name: Install xvfb
+        run: sudo apt-get install -y xvfb
 
       - name: Run scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: python scraper/main.py
+        run: xvfb-run -a --server-args="-screen 0 1920x1080x24" python scraper/main.py

@@ -9,6 +9,11 @@ def test_get_scraper_moxfield():
 
 def test_get_scraper_deckstats():
     from scrapers.deckstats import scrape
+    assert get_scraper("https://deckstats.net/binders/58989") is scrape
+
+
+def test_get_scraper_deckstats_legacy_collection_url():
+    from scrapers.deckstats import scrape
     assert get_scraper("https://deckstats.net/collection/45416") is scrape
 
 

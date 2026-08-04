@@ -36,7 +36,7 @@ def test_real_binder_has_more_than_4_pages():
 
 from scrapers.deckstats import scrape as scrape_deckstats
 
-DECKSTATS_URL = "https://deckstats.net/collection/45416"
+DECKSTATS_URL = "https://deckstats.net/binders/58989"
 
 
 def test_deckstats_binder_returns_cards():
@@ -56,9 +56,9 @@ def test_deckstats_card_structure():
         assert card["quantity"] >= 1
 
 
-def test_deckstats_binder_has_more_than_300_cards():
-    """Collection 45416 has 481 cards — verify full pagination returns 300+."""
+def test_deckstats_binder_spans_multiple_pages():
+    """Binder 58989 has ~1451 entries — verify pagination goes past the first page."""
     cards = scrape_deckstats(DECKSTATS_URL)
-    assert len(cards) > 300, (
-        f"Expected more than 300 cards from deckstats collection, got {len(cards)}"
+    assert len(cards) > 1000, (
+        f"Expected more than 1000 cards from deckstats binder, got {len(cards)}"
     )
