@@ -26,7 +26,8 @@ bot.command("start", async (ctx) => {
 });
 
 const BINDER_URL_RE =
-  /^https:\/\/(moxfield\.com\/binders\/[A-Za-z0-9_-]+|deckstats\.net\/collection\/\d+)/;
+  // deckstats moved binders from /collection/<id> to /binders/<id>; both accepted.
+  /^https:\/\/(moxfield\.com\/binders\/[A-Za-z0-9_-]+|deckstats\.net\/(?:binders|collection)\/\d+)/;
 
 bot.command("register", async (ctx) => {
   if (!ctx.from) {
@@ -35,7 +36,7 @@ bot.command("register", async (ctx) => {
   }
   const url = ctx.match?.trim();
   if (!url || !BINDER_URL_RE.test(url)) {
-    await ctx.reply("Please provide a valid binder URL.\nExamples:\n/register https://moxfield.com/binders/ABC123\n/register https://deckstats.net/collection/12345");
+    await ctx.reply("Please provide a valid binder URL.\nExamples:\n/register https://moxfield.com/binders/ABC123\n/register https://deckstats.net/binders/12345");
     return;
   }
   await upsertUser(supabase, ctx.from.id, ctx.from.username);

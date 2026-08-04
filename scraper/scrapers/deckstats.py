@@ -1,30 +1,69 @@
 # scraper/scrapers/deckstats.py
 import re
+import math
 import logging
 import urllib.parse
 from patchright.sync_api import sync_playwright
-from .base import launch_browser
+from .base import launch_real_browser
 
 log = logging.getLogger(__name__)
 
-PAGE_SIZE = 100  # DataTables page size used by deckstats
+# Deckstats only honours a whitelist of page sizes on /api/collection/list and
+# silently falls back to 50 for anything else. 500 is the largest accepted value.
+PAGE_SIZE = 500
+
+API_PATH = "/api/collection/list"
+
+# Deckstats moved binders from /collection/<id> to /binders/<id>. The numeric ID
+# is unchanged, so both forms are accepted for binders registered under the old
+# URL.
+BINDER_ID_RE = re.compile(r"/(?:binders|collection)/(\d+)")
 
 
 def extract_collection_id(url: str) -> str:
-    match = re.search(r"/collection/(\d+)", url)
+    match = BINDER_ID_RE.search(url)
     if not match:
         raise ValueError(f"Cannot extract collection ID from URL: {url}")
     return match.group(1)
 
 
+def binder_url(collection_id: str) -> str:
+    return f"https://deckstats.net/binders/{collection_id}"
+
+
+def api_url(collection_id: str, page: int, per_page: int = PAGE_SIZE) -> str:
+    query = urllib.parse.urlencode(
+        {
+            "public_binder": collection_id,
+            "sort": "name",
+            "dir": "asc",
+            "page": page,
+            "per_page": per_page,
+        }
+    )
+    return f"https://deckstats.net{API_PATH}?{query}"
+
+
+# CloudFlare fingerprints Playwright's out-of-band HTTP client and answers it
+# with 403, so the API has to be called from inside the loaded page instead.
+_FETCH_JS = """
+async (url) => {
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) return { status: res.status, data: null };
+  return { status: res.status, data: await res.json() };
+}
+"""
+
+
 def parse_deckstats_response(api_response: dict) -> list[dict]:
-    """Parse cards from a Deckstats api_cards.php DataTables response.
+    """Parse cards from a Deckstats /api/collection/list response.
 
     Response shape:
-      {"iTotalRecords": N, "aaData": [{"name": "...", "amount": "N"}, ...]}
+      {"total": N, "page": N, "per_page": N,
+       "items": [{"name": "...", "amount": N, ...}, ...]}
     """
     result = []
-    rows = api_response.get("aaData", [])
+    rows = api_response.get("items", [])
     if not isinstance(rows, list):
         return result
     for entry in rows:
@@ -41,85 +80,72 @@ def parse_deckstats_response(api_response: dict) -> list[dict]:
     return result
 
 
+def total_pages(total: int, per_page: int) -> int:
+    """Number of pages needed to cover `total` entries."""
+    if total <= 0 or per_page <= 0:
+        return 0
+    return math.ceil(total / per_page)
+
+
 def scrape(url: str) -> list[dict]:
-    """Load a Deckstats collection page and fetch all cards via the DataTables API."""
+    """Load a Deckstats binder page and fetch all cards via the JSON API."""
     collection_id = extract_collection_id(url)
     all_cards: list[dict] = []
-    total_records = None
-    first_api_url = None
 
     with sync_playwright() as p:
-        with launch_browser(p) as (browser, context):
+        with launch_real_browser(p) as context:
             page = context.new_page()
 
-            def handle_response(response):
-                nonlocal total_records, first_api_url
-                if (
-                    "api_cards.php" in response.url
-                    and response.status == 200
-                    and collection_id in response.url
-                ):
-                    try:
-                        data = response.json()
-                        if total_records is None:
-                            total_records = int(data.get("iTotalRecords", 0))
-                            first_api_url = response.url
-                            log.info(
-                                "Deckstats collection %s: %s total records, api url: %s",
-                                collection_id,
-                                total_records,
-                                first_api_url[:120],
-                            )
-                        cards = parse_deckstats_response(data)
-                        if cards:
-                            all_cards.extend(cards)
-                            log.info(
-                                "Parsed %s cards from %s",
-                                len(cards),
-                                response.url[:100],
-                            )
-                    except Exception as exc:
-                        log.warning("Failed to parse deckstats response: %s", exc)
+            # Load the binder page first so the browser picks up the CloudFlare
+            # clearance cookies the API requires.
+            target = binder_url(collection_id)
+            log.info("Navigating to %s", target)
+            page.goto(target, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(5000)
 
-            page.on("response", handle_response)
-
-            log.info("Navigating to %s", url)
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(10000)
-
-            # Fetch remaining pages via page.request (uses session cookies)
-            if total_records and first_api_url:
-                # Derive base URL by stripping iDisplayStart from the intercepted URL
-                parsed = urllib.parse.urlparse(first_api_url)
-                params = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-                # Remove iDisplayStart so we can set it ourselves
-                params.pop("iDisplayStart", None)
-                # Flatten single-value lists
-                flat_params = {k: v[0] for k, v in params.items()}
-
-                # Use the actual page size from the API URL, not a hardcoded constant
-                actual_page_size = int(flat_params.get("iDisplayLength", PAGE_SIZE))
-                log.info("Deckstats page size from API: %s, total records: %s", actual_page_size, total_records)
-
-                for start in range(actual_page_size, total_records, actual_page_size):
-                    flat_params["iDisplayStart"] = str(start)
-                    api_url = urllib.parse.urlunparse(
-                        parsed._replace(query=urllib.parse.urlencode(flat_params))
+            page_number = 1
+            pages = None
+            while pages is None or page_number <= pages:
+                resp = page.evaluate(_FETCH_JS, api_url(collection_id, page_number))
+                if resp.get("status") != 200 or not resp.get("data"):
+                    log.warning(
+                        "Non-200 response %s for page %s of collection %s",
+                        resp.get("status"),
+                        page_number,
+                        collection_id,
                     )
+                    break
+                data = resp["data"]
+
+                if pages is None:
+                    total = int(data.get("total", 0))
+                    # The API clamps per_page to a whitelist; trust what it returns.
+                    per_page = int(data.get("per_page") or PAGE_SIZE)
+                    pages = total_pages(total, per_page)
                     log.info(
-                        "Fetching page starting at %s/%s", start, total_records
+                        "Deckstats collection %s: %s entries, %s per page, %s pages",
+                        collection_id,
+                        total,
+                        per_page,
+                        pages,
                     )
-                    resp = page.request.get(api_url)
-                    if resp.status != 200:
-                        log.warning("Non-200 response %s for offset %s", resp.status, start)
-                        continue
-                    result = resp.json()
-                    cards = parse_deckstats_response(result)
-                    all_cards.extend(cards)
-                    log.info("Fetched %s cards (offset %s)", len(cards), start)
+                    if pages == 0:
+                        break
+
+                cards = parse_deckstats_response(data)
+                if not cards:
+                    log.warning("Page %s returned no cards, stopping", page_number)
+                    break
+                all_cards.extend(cards)
+                log.info("Parsed %s cards from page %s/%s", len(cards), page_number, pages)
+                page_number += 1
 
     if all_cards:
-        log.info("Total cards scraped from deckstats collection %s: %s", collection_id, len(all_cards))
+        log.info(
+            "Total cards scraped from deckstats collection %s: %s",
+            collection_id,
+            len(all_cards),
+        )
     else:
         log.warning("No cards found for deckstats collection %s", collection_id)
 
